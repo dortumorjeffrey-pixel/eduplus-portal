@@ -248,6 +248,52 @@
       background: rgba(20, 56, 68, 0.95);
     }
 
+    /* TYPING LANGUAGE PANEL & KEY GUIDE — dark mode legibility.
+       The header/preview strips use gradients (from-cyan-50, to-white, etc.)
+       which are not covered by the flat background overrides above. They used
+       to stay light while their text was forced to white, so the labels were
+       invisible. These rules give the strips a dark surface and keep the
+       muted cyan helper text readable. */
+    html[data-theme="dark"] #typingLanguagePanel,
+    html[data-theme="dark"] #typingKeyGuide > div {
+      background: rgba(10, 31, 38, 0.98) !important;
+      border-color: rgba(56, 135, 155, 0.7) !important;
+      color: #e6fffb !important;
+    }
+    html[data-theme="dark"] #typingPanelDragHandle,
+    html[data-theme="dark"] .typing-guide-head,
+    html[data-theme="dark"] .typing-preview-surface {
+      background: linear-gradient(135deg, rgba(18, 54, 65, 0.98), rgba(12, 38, 46, 0.98)) !important;
+      border-color: rgba(56, 135, 155, 0.7) !important;
+    }
+    html[data-theme="dark"] #typingLanguagePanel h3,
+    html[data-theme="dark"] #typingLanguagePanel h4,
+    html[data-theme="dark"] #typingLanguagePanel p,
+    html[data-theme="dark"] #typingLanguagePanel label,
+    html[data-theme="dark"] #typingLanguagePanel span,
+    html[data-theme="dark"] #typingKeyGuide span,
+    html[data-theme="dark"] #typingKeyGuide p {
+      color: #e6fffb !important;
+    }
+    html[data-theme="dark"] #typingLanguagePanel .text-cyan-500,
+    html[data-theme="dark"] #typingLanguagePanel .text-cyan-600,
+    html[data-theme="dark"] #typingLanguagePanel .text-cyan-700,
+    html[data-theme="dark"] #typingKeyGuide .text-cyan-500,
+    html[data-theme="dark"] #typingKeyGuide .text-cyan-600,
+    html[data-theme="dark"] #typingKeyGuide .text-cyan-700 {
+      color: #8be9e0 !important;
+    }
+    html[data-theme="dark"] #typingLanguagePanel select,
+    html[data-theme="dark"] #typingLanguagePanel select option {
+      background-color: #0d2830 !important;
+      color: #f0fdfa !important;
+      border-color: rgba(56, 135, 155, 0.8) !important;
+    }
+    html[data-theme="dark"] #typingLanguagePanel button,
+    html[data-theme="dark"] #typingKeyGuide button {
+      color: #d7fffb !important;
+    }
+
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: rgba(224, 247, 250, 0.5); border-radius: 4px; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #80deea; border-radius: 4px; }
@@ -503,17 +549,28 @@
     </div>
     <script>
       (function() {
+        // The app now stays on the loading screen for about 6 seconds so the
+        // 1% -> 100% progress is actually visible before the pages appear.
+        var SPLASH_MIN_MS = 6000;
+        var startedAt = Date.now();
+        window.__eduplusSplashStart = startedAt;
+        window.__eduplusSplashMinMs = SPLASH_MIN_MS;
+
         var bar = document.getElementById('splashProgressBar');
         var text = document.getElementById('splashProgressPercent');
         var status = document.getElementById('splashProgressStatus');
         var splash = document.getElementById('initialSplashOverlay');
         if (!splash) return;
+
         var pct = 1;
+        var dismissed = false;
+
         function dismissSplash() {
-          if (!splash) return;
+          if (dismissed) return;
+          dismissed = true;
           splash.style.pointerEvents = 'none';
           splash.classList.add('pointer-events-none');
-          splash.style.transition = 'opacity 0.25s ease';
+          splash.style.transition = 'opacity 0.35s ease';
           splash.style.opacity = '0';
           setTimeout(function() {
             splash.style.display = 'none';
@@ -521,10 +578,17 @@
             if (typeof window.restorePersistedView === 'function') {
               try { window.restorePersistedView(); } catch (e) {}
             }
-          }, 260);
+          }, 360);
         }
+
+        // Shared with the app engine so no other script dismisses it early.
+        window.__eduplusFinishSplash = dismissSplash;
+
         var timer = setInterval(function() {
-          pct = Math.min(100, pct + Math.floor(Math.random() * 8) + 4);
+          // Drive the bar from real elapsed time so heavy script startup cannot
+          // stretch (or stall) the loading screen.
+          var elapsed = Date.now() - startedAt;
+          pct = Math.min(100, Math.max(1, Math.round((elapsed / SPLASH_MIN_MS) * 100)));
           if (bar) bar.style.width = pct + '%';
           if (text) text.textContent = pct + '%';
           if (pct > 30 && pct < 70) {
@@ -534,21 +598,25 @@
           } else if (pct >= 95) {
             if (status) status.textContent = "Ready!";
           }
-          if (pct >= 100) {
+          if (elapsed >= SPLASH_MIN_MS || pct >= 100) {
             clearInterval(timer);
-            setTimeout(dismissSplash, 80);
+            dismissSplash();
           }
-        }, 20);
+        }, 60);
+
+        // Hard fail-safe: never leave the splash covering the app.
         setTimeout(function() {
           clearInterval(timer);
+          if (bar) bar.style.width = '100%';
+          if (text) text.textContent = '100%';
           dismissSplash();
-        }, 6000);
+        }, SPLASH_MIN_MS + 800);
       })();
     </script>
   </div>
 
   <!-- SECONDARY PAGE/CLOUD ACTION LOADING OVERLAY -->
-  <div id="loadingOverlay" class="fixed inset-0 bg-cyan-950/60 backdrop-blur-md z-[100] flex flex-col items-center justify-center transition-all duration-300 pointer-events-none opacity-0 hidden">
+  <div id="loadingOverlay" class="fixed inset-0 bg-cyan-950/60 backdrop-blur-md z-[185] flex flex-col items-center justify-center transition-all duration-300 pointer-events-none opacity-0 hidden">
     <div class="glass-card bg-white/95 p-6 sm:p-8 rounded-3xl flex flex-col items-center space-y-4 shadow-2xl border border-white max-w-xs w-full mx-4 text-center transform transition-transform scale-95 duration-200">
       <div class="relative flex items-center justify-center">
         <div class="w-14 h-14 border-4 border-cyan-200 border-t-cyan-600 rounded-full animate-spin"></div>
@@ -665,7 +733,7 @@
 
         <div id="typingLanguageStatus" class="text-[11px] font-semibold text-cyan-800 bg-cyan-50 border border-cyan-200 rounded-xl px-3 py-2"></div>
 
-        <div class="rounded-2xl border border-cyan-200 bg-gradient-to-b from-slate-50 to-white p-2.5 sm:p-3 space-y-1.5">
+        <div class="rounded-2xl border border-cyan-200 bg-gradient-to-b from-slate-50 to-white p-2.5 sm:p-3 space-y-1.5 typing-preview-surface">
           <div class="flex flex-wrap items-center justify-between gap-1 px-1 pb-1">
             <span class="text-[10px] font-black uppercase tracking-wider text-cyan-700">Key preview</span>
             <span class="text-[9px] font-bold text-cyan-500">Big letter = what it types · small = laptop key</span>
@@ -684,7 +752,7 @@
   <!-- FLOATING KEY GUIDE (visible while the laptop keyboard is mapped) -->
   <div id="typingKeyGuide" class="fixed z-[140] hidden left-2 bottom-2 sm:left-4 sm:bottom-4 w-[min(26rem,calc(100vw-1rem))]">
     <div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl border border-cyan-300 overflow-hidden">
-      <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-gradient-to-r from-cyan-50 to-teal-50 border-b border-cyan-200">
+      <div class="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-gradient-to-r from-cyan-50 to-teal-50 border-b border-cyan-200 typing-guide-head">
         <span id="typingKeyGuideTitle" class="text-[10px] font-black text-cyan-950 truncate"><i class="fas fa-keyboard text-cyan-600 mr-1"></i>Key guide</span>
         <div class="flex items-center space-x-1 shrink-0">
           <button id="btnTypingGuideDim" type="button" title="Make key guide transparent" class="p-1 rounded-lg text-cyan-600 hover:text-cyan-900 hover:bg-cyan-100 transition"><i class="fas fa-circle-half-stroke text-[10px]"></i></button>
@@ -1877,7 +1945,7 @@
   </div>
 
   <!-- MODAL: WEBCAM CAMERA -->
-  <div id="cameraCaptureModal" class="fixed inset-0 bg-cyan-950/60 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+  <div id="cameraCaptureModal" class="fixed inset-0 bg-cyan-950/70 backdrop-blur-md z-[130] hidden flex items-center justify-center p-4">
     <div class="glass-card modal-pop bg-white/95 rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-cyan-100 pb-3">
         <h3 class="text-sm sm:text-base font-bold text-cyan-950"><i class="fas fa-camera text-teal-600 mr-2"></i> Capture Face Photo</h3>
@@ -2077,7 +2145,7 @@
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // PAYSTACK TEST PUBLIC KEY
-    const PAYSTACK_PUBLIC_KEY = "pk_live_3aae1eec1c5298079ca3d9013fd99929c56110d8";
+    const PAYSTACK_PUBLIC_KEY = "pk_test_35c770e8b45d22fd7ba408998e63536523613cc6";
 
     // PRICING CONFIGURATION (Amounts in GHS: 1 GHS = 100 Pesewas)
     const PRICING = {
@@ -2754,77 +2822,52 @@
       }
     ];
 
-    const SEED_COURSES = [
-      {
-        code: "CS101",
-        title: "Introduction to Computer Science & Algorithms",
-        lecturerName: "Dr. Kwesi Mensah",
-        lecturerEmail: "kwesi.mensah@ucc.edu.gh",
-        lecturerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
-        semester: "Semester 1",
-        level: "Level 100",
-        registeredAt: Date.now() - 86400000 * 5
-      },
-      {
-        code: "MATH101",
-        title: "Calculus & Analytical Geometry",
-        lecturerName: "Prof. Emmanuel Asante",
-        lecturerEmail: "emmanuel.asante@ucc.edu.gh",
-        lecturerAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80",
-        semester: "Semester 1",
-        level: "Level 100",
-        registeredAt: Date.now() - 86400000 * 4
-      },
-      {
-        code: "ENG201",
-        title: "Academic Writing & Research Communication",
-        lecturerName: "Dr. Abena Osei",
-        lecturerEmail: "abena.osei@ucc.edu.gh",
-        lecturerAvatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80",
-        semester: "Semester 2",
-        level: "Level 200",
-        registeredAt: Date.now() - 86400000 * 3
-      }
+    /* Courses, assignments and lecturer accounts are created by real lecturers.
+       Older versions of this file auto-created a demo lecturer account together
+       with sample courses and assignments. Nothing is seeded any more, and any
+       legacy demo records that are still stored on this device/cloud are removed
+       so only genuine lecturer-created data is shown. */
+    const LEGACY_DEMO_LECTURER_EMAILS = [
+      'kwesi.mensah@ucc.edu.gh',
+      'emmanuel.asante@ucc.edu.gh',
+      'abena.osei@ucc.edu.gh'
     ];
+    const LEGACY_DEMO_COURSE_CODES = ['CS101', 'MATH101', 'ENG201'];
+    const LEGACY_DEMO_ASSIGNMENT_IDS = ['asgn_cs101_demo', 'asgn_math101_demo'];
 
-    const SEED_ASSIGNMENTS = [
-      {
-        id: "asgn_cs101_demo",
-        courseCode: "CS101",
-        courseTitle: "Introduction to Computer Science & Algorithms",
-        title: "Algorithm Flowcharts & Complexity Analysis",
-        description: "Write pseudo-code and create flowcharts for binary search and quicksort. Submit as PDF or document.",
-        deadlineDate: "2026-12-15",
-        deadlineTime: "23:59",
-        deadlineTimestamp: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        targetLevel: "Level 100",
-        semester: "Semester 1",
-        lecturerEmail: "kwesi.mensah@ucc.edu.gh",
-        timestamp: Date.now() - 86400000
-      },
-      {
-        id: "asgn_math101_demo",
-        courseCode: "MATH101",
-        courseTitle: "Calculus & Analytical Geometry",
-        title: "Integration by Parts & Multivariable Limits",
-        description: "Solve problems 1-15 from Chapter 4 of the lecture notes. Show all steps clearly.",
-        deadlineDate: "2026-12-20",
-        deadlineTime: "18:00",
-        deadlineTimestamp: Date.now() + 35 * 24 * 60 * 60 * 1000,
-        targetLevel: "Level 100",
-        semester: "Semester 1",
-        lecturerEmail: "emmanuel.asante@ucc.edu.gh",
-        timestamp: Date.now() - 86400000
-      }
-    ];
+    function isLegacyDemoLecturerEmail(email) {
+      return LEGACY_DEMO_LECTURER_EMAILS.includes((email || '').toString().trim().toLowerCase());
+    }
 
-    let dbCourses = getStoredData("courses", SEED_COURSES);
-    if (!Array.isArray(dbCourses) || dbCourses.length === 0) dbCourses = SEED_COURSES;
+    function isLegacyDemoCourse(course) {
+      if (!course) return false;
+      const code = (course.code || '').toString().trim().toUpperCase();
+      return LEGACY_DEMO_COURSE_CODES.includes(code) && isLegacyDemoLecturerEmail(course.lecturerEmail);
+    }
 
-    let dbAssignments = getStoredData("assignments", SEED_ASSIGNMENTS);
-    if (!Array.isArray(dbAssignments) || dbAssignments.length === 0) dbAssignments = SEED_ASSIGNMENTS;
+    function isLegacyDemoAssignment(assignment) {
+      if (!assignment) return false;
+      return LEGACY_DEMO_ASSIGNMENT_IDS.includes((assignment.id || '').toString())
+        || isLegacyDemoLecturerEmail(assignment.lecturerEmail);
+    }
+
+    let dbCourses = getStoredData("courses", []);
+    if (!Array.isArray(dbCourses)) dbCourses = [];
+    dbCourses = dbCourses.filter(c => !isLegacyDemoCourse(c));
+
+    let dbAssignments = getStoredData("assignments", []);
+    if (!Array.isArray(dbAssignments)) dbAssignments = [];
+    dbAssignments = dbAssignments.filter(a => !isLegacyDemoAssignment(a));
+
+    // Persist the cleaned lists so the demo records cannot reappear from cache.
+    try {
+      setStoredData('courses', dbCourses);
+      setStoredData('assignments', dbAssignments);
+    } catch (e) {}
 
     let dbUsers = getStoredData("users", []);
+    if (!Array.isArray(dbUsers)) dbUsers = [];
+    dbUsers = dbUsers.filter(u => !(u && u.role === 'lecturer' && isLegacyDemoLecturerEmail(u.email)));
     let dbSubmissions = getStoredData("submissions", []);
     let dbQuestions = getStoredData("questions", []);
     let dbPermanentMarks = getStoredData("permanentMarks", []);
@@ -4454,48 +4497,20 @@
         return;
       }
 
-      const bar = document.getElementById('splashProgressBar');
-      const text = document.getElementById('splashProgressPercent');
-      const status = document.getElementById('splashProgressStatus');
+      // The inline loader inside #initialSplashOverlay runs the 1% -> 100%
+      // animation and keeps the screen visible for about 6 seconds. It calls
+      // restorePersistedView() itself when it finishes, so this function must
+      // never dismiss the splash early.
+      if (typeof window.__eduplusFinishSplash === 'function') return;
 
-      let currentPct = 1;
-
-      const finishSplash = () => {
+      // Fallback if the inline loader was unavailable for any reason.
+      setTimeout(() => {
         if (splash) {
-          splash.classList.add('opacity-0');
-          setTimeout(() => {
-            splash.classList.add('hidden');
-            splash.style.display = 'none';
-            restorePersistedView();
-          }, 250);
-        } else {
-          restorePersistedView();
+          splash.classList.add('hidden');
+          splash.style.display = 'none';
         }
-      };
-
-      const failSafe = setTimeout(finishSplash, 1200);
-
-      const interval = setInterval(() => {
-        const step = Math.floor(Math.random() * 8) + 4;
-        currentPct = Math.min(100, currentPct + step);
-
-        if (bar) bar.style.width = currentPct + '%';
-        if (text) text.textContent = currentPct + '%';
-
-        if (currentPct > 30 && currentPct < 70) {
-          if (status) status.textContent = 'Connecting to Cloud Database...';
-        } else if (currentPct >= 70 && currentPct < 95) {
-          if (status) status.textContent = 'Syncing Courses & Security Tokens...';
-        } else if (currentPct >= 95) {
-          if (status) status.textContent = 'Ready!';
-        }
-
-        if (currentPct >= 100) {
-          clearInterval(interval);
-          clearTimeout(failSafe);
-          setTimeout(finishSplash, 100);
-        }
-      }, 20);
+        restorePersistedView();
+      }, 6000);
     }
 
     /* VIEW NAVIGATION WITH BROWSER HISTORY INTEGRATION & REFRESH PERSISTENCE */
@@ -5038,6 +5053,12 @@
       document.getElementById('btnCloseCameraModal').addEventListener('click', closeCamera);
       document.getElementById('btnCancelCam').addEventListener('click', closeCamera);
       document.getElementById('btnCaptureSnapshot').addEventListener('click', captureCameraSnapshot);
+      // Escape closes the camera window first, leaving the Edit Profile form open behind it.
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const cam = document.getElementById('cameraCaptureModal');
+        if (cam && !cam.classList.contains('hidden')) { e.preventDefault(); closeCamera(); }
+      });
       document.getElementById('regFileInput').addEventListener('change', (e) => handleFilePfp(e, 'reg'));
       document.getElementById('editFileInput').addEventListener('change', (e) => handleFilePfp(e, 'edit'));
       document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
@@ -5243,14 +5264,25 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         state.webcamStream = stream;
-        document.getElementById('cameraVideo').srcObject = stream;
-        document.getElementById('cameraCaptureModal').classList.remove('hidden');
+        const modal = document.getElementById('cameraCaptureModal');
+        const video = document.getElementById('cameraVideo');
+        video.srcObject = stream;
+        // The camera window is layered ABOVE the Edit Profile window so the user
+        // can snap a photo without closing the form behind it.
+        modal.classList.remove('hidden');
+        modal.style.zIndex = '130';
+        try { const p = video.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+        const captureBtn = modal.querySelector('#btnCaptureSnapshot');
+        if (captureBtn) captureBtn.focus();
       } catch (err) { showToast("Webcam access denied or unavailable.", "error"); }
     }
 
     function closeCamera() {
       if (state.webcamStream) { state.webcamStream.getTracks().forEach(t => t.stop()); state.webcamStream = null; }
-      document.getElementById('cameraCaptureModal').classList.add('hidden');
+      const modal = document.getElementById('cameraCaptureModal');
+      const video = document.getElementById('cameraVideo');
+      if (video) video.srcObject = null;
+      if (modal) modal.classList.add('hidden');
     }
 
     function captureCameraSnapshot() {
@@ -6089,8 +6121,25 @@ if (!user) {
       }
     }
 
+    let logoutInProgress = false;
     async function handleLogout() {
-      try { await showLoading("Logging out...", 300); await signOut(fbAuth); } catch (e) {}
+      if (logoutInProgress) return;
+      logoutInProgress = true;
+
+      // Keep the spinner on screen long enough for the user to see it complete
+      // before any "logged out" message is shown.
+      const MIN_SPIN_MS = 1400;
+      const spinStartedAt = Date.now();
+      try { await showLoading("Logging out...", 0); } catch (e) {}
+      try { await signOut(fbAuth); } catch (e) {}
+
+      const remainingSpin = MIN_SPIN_MS - (Date.now() - spinStartedAt);
+      if (remainingSpin > 0) await new Promise(resolve => setTimeout(resolve, remainingSpin));
+
+      // Close the spinner first, then show the success notice.
+      hideLoading();
+      await new Promise(resolve => setTimeout(resolve, 220));
+
       state.currentUser = null;
       setStoredData('currentUserSession', null);
       localStorage.removeItem('eduplus_last_view');
@@ -6098,6 +6147,7 @@ if (!user) {
       document.getElementById('subExpiredModal').classList.add('hidden');
       showToast("Logged out successfully.", "info");
       navigateToView('roleSelectView');
+      logoutInProgress = false;
     }
     window.handleLogout = handleLogout;
 
@@ -9181,8 +9231,9 @@ async function handleStudentAddCourseByCode(e) {
         }
       });
       if (liveCourses.length > 0) {
-        platformCourses = liveCourses;
-        dbCourses = liveCourses; // update local cache
+        const cleanedLiveCourses = liveCourses.filter(c => !isLegacyDemoCourse(c));
+        platformCourses = cleanedLiveCourses;
+        dbCourses = cleanedLiveCourses; // update local cache
       }
     } catch (err) {
       console.error("Error fetching courses snapshot:", err);
@@ -11748,7 +11799,8 @@ function rebuildDbUsersFromCloud() {
     });
   }
 
-  dbUsers = Array.from(userMap.values());
+  dbUsers = Array.from(userMap.values())
+    .filter(u => !(u && u.role === 'lecturer' && isLegacyDemoLecturerEmail(u.email)));
   scheduleOnDataChanged();
 }  
 
@@ -11840,9 +11892,15 @@ function rebuildDbUsersFromCloud() {
           knownDocs[name].forEach(json => {
             try { list.push(JSON.parse(json)); } catch(e) {}
           });
+          // Never surface legacy demo records, even if an older build left them in the cloud.
+          const cleanedList = name === 'courses'
+            ? list.filter(item => !isLegacyDemoCourse(item))
+            : name === 'assignments'
+              ? list.filter(item => !isLegacyDemoAssignment(item))
+              : list;
           const previousJson = JSON.stringify(dbMap[name].get() || []);
-          const nextJson = JSON.stringify(list);
-          dbMap[name].set(list);
+          const nextJson = JSON.stringify(cleanedList);
+          dbMap[name].set(cleanedList);
           if (previousJson !== nextJson) scheduleOnDataChanged();
 
           loadedOperational[name] = true;
